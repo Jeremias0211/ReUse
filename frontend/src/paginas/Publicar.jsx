@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import InsigniaEstado from '../componentes/InsigniaEstado';
+import { api } from '../api';
 
 const CATEGORIAS = ['Celulares', 'Notebooks', 'Consolas', 'Monitores', 'Auriculares', 'Periféricos', 'Otros'];
 const CONDICIONES = ['Excelente', 'Muy bueno', 'Bueno', 'Aceptable'];
@@ -70,7 +71,7 @@ const LOCALIDADES = [
   { nombre: 'Salta Capital', ciudad: 'Salta', zona: 'Centro', lat: -24.7821, lng: -65.4232, radio: 1200 }
 ];
 
-export default function Publicar() {
+export default function Publicar({ session, alIniciarSesion, alPublicar }) {
   const [datosFormulario, setDatosFormulario] = useState({
     titulo: '',
     categoria: 'Celulares',
@@ -80,26 +81,48 @@ export default function Publicar() {
     descripcion: ''
   });
 
-  const [fotos, setFotos] = useState([]); // Array para almacenar múltiples fotos seleccionadas
+  const [fotos, setFotos] = useState([]); // Fotos en formato de datos para guardarlas junto al producto
   const [fotoActivaIndex, setFotoActivaIndex] = useState(0); // Índice de la foto que se muestra grande en la vista previa
   const [error, setError] = useState('');
   const [exito, setExito] = useState(false);
+  const [guardando, setGuardando] = useState(false);
 
   const manejarCambio = (e) => {
     const { name, value } = e.target;
     setDatosFormulario(prev => ({ ...prev, [name]: value }));
   };
 
-  const manejarSeleccionFotos = (e) => {
-    const archivos = Array.from(e.target.files);
-    setFotos(archivos);
-    setFotoActivaIndex(0); // Reiniciar a la primera foto
+  const manejarSeleccionFotos = async (e) => {
+    const archivos = Array.from(e.target.files).slice(0, 5);
+    if (archivos.some((archivo) => archivo.size > 1_000_000)) {
+      setError('Cada foto debe pesar menos de 1 MB para poder guardarla.');
+      e.target.value = '';
+      return;
+    }
+    try {
+      const fotosData = await Promise.all(archivos.map((archivo) => new Promise((resolve, reject) => {
+        const lector = new FileReader();
+        lector.onload = () => resolve(lector.result);
+        lector.onerror = reject;
+        lector.readAsDataURL(archivo);
+      })));
+      setFotos(fotosData);
+      setFotoActivaIndex(0);
+      setError('');
+    } catch {
+      setError('No se pudieron leer las fotos seleccionadas.');
+    }
   };
 
-  const manejarEnvio = (e) => {
+  const manejarEnvio = async (e) => {
     e.preventDefault();
     setError('');
     setExito(false);
+
+    if (!session?.token) {
+      alIniciarSesion?.();
+      return;
+    }
 
     if (!datosFormulario.titulo.trim() || !datosFormulario.precio) {
       setError('Por favor completá el Título y el Precio del producto.');
@@ -111,7 +134,33 @@ export default function Publicar() {
       return;
     }
 
-    setExito(true);
+    setGuardando(true);
+    try {
+      await api('/api/productos', {
+        method: 'POST',
+        token: session.token,
+        body: JSON.stringify({
+          ...datosFormulario,
+          precio: Number(datosFormulario.precio),
+          fotos,
+          ubicacion: {
+            ciudad: localidadSeleccionada.ciudad,
+            zona: localidadSeleccionada.zona,
+            lat: localidadSeleccionada.lat,
+            lng: localidadSeleccionada.lng,
+            radioMetros: localidadSeleccionada.radio
+          }
+        })
+      });
+      setExito(true);
+      setDatosFormulario({ titulo: '', categoria: 'Celulares', precio: '', condicion: 'Excelente', localidadIndex: '0', descripcion: '' });
+      setFotos([]);
+      setFotoActivaIndex(0);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const localidadSeleccionada = LOCALIDADES[Number(datosFormulario.localidadIndex)] || LOCALIDADES[0];
@@ -136,7 +185,7 @@ export default function Publicar() {
 
       {exito && (
         <div className="success-banner" style={{ marginBottom: '20px' }}>
-          ¡Publicación validada con éxito! (SUGERENCIA: La persistencia y guardado real se conectarán más adelante a la base de datos SQL).
+          ¡Listo! La publicación quedó guardada y seguirá disponible aunque cierres sesión. <button type="button" className="text-button" onClick={alPublicar}>Ver catálogo</button>
         </div>
       )}
 
@@ -240,11 +289,12 @@ export default function Publicar() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Fotos del producto (puedes seleccionar varias fotos a la vez)</label>
+              <label className="form-label">Fotos del producto (hasta 5 imágenes de 1 MB cada una)</label>
               <input 
                 type="file" 
                 accept="image/*" 
                 multiple 
+                disabled={guardando}
                 onChange={manejarSeleccionFotos}
                 style={{ display: 'block', width: '100%', padding: '10px', background: '#FAFAFA', border: '1px solid #CBD5E1', borderRadius: '8px', cursor: 'pointer' }}
               />
@@ -265,7 +315,7 @@ export default function Publicar() {
                           overflow: 'hidden', 
                           border: fotoActivaIndex === index ? '2px solid var(--esmeralda)' : '2px solid #CBD5E1',
                           cursor: 'pointer',
-                          backgroundImage: `url(${URL.createObjectURL(foto)})`,
+                          backgroundImage: `url(${foto})`,
                           backgroundSize: 'cover',
                           backgroundPosition: 'center'
                         }}
@@ -277,8 +327,8 @@ export default function Publicar() {
               )}
             </div>
 
-            <button type="submit" className="form-submit-btn">
-              Publicar producto
+            <button type="submit" className="form-submit-btn" disabled={guardando}>
+              {guardando ? 'Guardando publicación…' : 'Publicar producto'}
             </button>
           </form>
         </div>
@@ -294,7 +344,7 @@ export default function Publicar() {
               <div 
                 className="product-card-img" 
                 style={{ 
-                  backgroundImage: fotos.length > 0 ? `url(${URL.createObjectURL(fotos[fotoActivaIndex] || fotos[0])})` : 'none', 
+                  backgroundImage: fotos.length > 0 ? `url(${fotos[fotoActivaIndex] || fotos[0]})` : 'none', 
                   backgroundSize: 'cover', 
                   backgroundPosition: 'center',
                   position: 'relative'
@@ -332,7 +382,7 @@ export default function Publicar() {
 
             <div style={{ marginTop: '16px', padding: '16px', backgroundColor: 'var(--blanco)', borderRadius: '12px', border: '1px solid #E5E7EB', fontSize: '0.9rem', color: '#4B5563' }}>
               <p style={{ fontWeight: '600', color: 'var(--petroleo)', marginBottom: '4px' }}>ℹ️ Información:</p>
-              <p>Podés subir múltiples fotos de tu dispositivo (frente, dorso, pantalla encendida, accesorios). Los compradores podrán verlas todas en el detalle.</p>
+              <p>Las imágenes se guardan con la publicación y aparecen en el catálogo. La ubicación solo muestra una zona aproximada.</p>
             </div>
           </div>
         </div>

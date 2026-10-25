@@ -1,7 +1,7 @@
 import React from 'react';
 import InsigniaEstado from './InsigniaEstado';
 
-export default function TarjetaProducto({ producto, alHacerClick, esFavorito, alAlternarFavorito }) {
+export default function TarjetaProducto({ producto, alHacerClick, esFavorito, alAlternarFavorito, alAgregarCarrito }) {
   const formatearPrecio = (precio) => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
@@ -43,7 +43,7 @@ export default function TarjetaProducto({ producto, alHacerClick, esFavorito, al
 
       <div onClick={() => alHacerClick(producto.id)} style={{ cursor: 'pointer' }}>
         <div className="product-card-img">
-          Foto
+          {producto.fotos?.[0] ? <img src={producto.fotos[0]} alt={producto.titulo} /> : <span>ReUse</span>}
         </div>
         <div className="product-card-body">
           <div className="product-card-header-row">
@@ -57,6 +57,7 @@ export default function TarjetaProducto({ producto, alHacerClick, esFavorito, al
           </div>
         </div>
       </div>
+      {alAgregarCarrito && <button className="add-cart-card" onClick={() => alAgregarCarrito(producto.id)}><span>＋</span> Agregar al carrito</button>}
     </div>
   );
 }

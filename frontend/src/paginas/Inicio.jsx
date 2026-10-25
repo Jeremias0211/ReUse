@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import BarraCategorias from '../componentes/BarraCategorias';
 import TarjetaProducto from '../componentes/TarjetaProducto';
+import { api } from '../api';
 
-export default function Inicio({ alSeleccionarProducto, favoritos, alAlternarFavorito, vistaFavoritos }) {
+export default function Inicio({ token, alSeleccionarProducto, favoritos, alAlternarFavorito, vistaFavoritos, alAgregarCarrito }) {
   const [productos, setProductos] = useState([]);
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('Todas');
   const [condicionFiltro, setCondicionFiltro] = useState('Todas');
@@ -16,11 +17,7 @@ export default function Inicio({ alSeleccionarProducto, favoritos, alAlternarFav
       ? '/api/productos' 
       : `/api/productos?categoria=${encodeURIComponent(categoriaSeleccionada)}`;
 
-    fetch(url)
-      .then(res => {
-        if (!res.ok) throw new Error('Error al cargar los productos');
-        return res.json();
-      })
+    api(url, { token })
       .then(data => {
         setProductos(data);
         setCargando(false);
@@ -29,7 +26,7 @@ export default function Inicio({ alSeleccionarProducto, favoritos, alAlternarFav
         setError(err.message);
         setCargando(false);
       });
-  }, [categoriaSeleccionada]);
+  }, [categoriaSeleccionada, token]);
 
   // Filtrar productos según vista (favoritos o todos), condición y precio máximo
   const productosFiltrados = productos.filter(prod => {
@@ -115,6 +112,7 @@ export default function Inicio({ alSeleccionarProducto, favoritos, alAlternarFav
               alHacerClick={alSeleccionarProducto}
               esFavorito={favoritos.includes(producto.id)}
               alAlternarFavorito={alAlternarFavorito}
+              alAgregarCarrito={alAgregarCarrito}
             />
           ))}
         </div>

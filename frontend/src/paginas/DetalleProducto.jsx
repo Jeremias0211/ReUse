@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import InsigniaEstado from '../componentes/InsigniaEstado';
 import ListaRevision from '../componentes/ListaRevision';
 import MapaUbicacion from '../componentes/MapaUbicacion';
+import { api } from '../api';
 
-export default function DetalleProducto({ productoId, alVolver, favoritos, alAlternarFavorito }) {
+export default function DetalleProducto({ token, productoId, alVolver, favoritos, alAlternarFavorito, alAgregarCarrito }) {
   const [producto, setProducto] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -17,11 +18,7 @@ export default function DetalleProducto({ productoId, alVolver, favoritos, alAlt
 
   useEffect(() => {
     setCargando(true);
-    fetch(`/api/productos/${productoId}`)
-      .then(res => {
-        if (!res.ok) throw new Error('Error al cargar el detalle del producto');
-        return res.json();
-      })
+    api(`/api/productos/${productoId}`, { token })
       .then(data => {
         setProducto(data);
         setCargando(false);
@@ -30,7 +27,7 @@ export default function DetalleProducto({ productoId, alVolver, favoritos, alAlt
         setError(err.message);
         setCargando(false);
       });
-  }, [productoId]);
+  }, [productoId, token]);
 
   if (cargando) return <div className="loading-state">Cargando detalle...</div>;
   if (error) return <div className="error-state">Error: {error}</div>;
@@ -102,7 +99,7 @@ export default function DetalleProducto({ productoId, alVolver, favoritos, alAlt
       <div className="detail-container">
         <div className="detail-main">
           <div className="detail-img-placeholder">
-            Foto del producto
+            {producto.fotos?.[0] ? <img src={producto.fotos[0]} alt={producto.titulo} /> : <span>ReUse</span>}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
@@ -121,6 +118,8 @@ export default function DetalleProducto({ productoId, alVolver, favoritos, alAlt
             {formatearPrecio(producto.precio)}
           </div>
 
+          <button className="detail-add-cart" onClick={() => alAgregarCarrito(producto.id)}>＋ Agregar al carrito</button>
+
           <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '20px', marginBottom: '24px' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '10px' }}>Descripción</h3>
             <p style={{ color: '#4B5563', lineHeight: '1.6' }}>{producto.descripcion}</p>
@@ -137,7 +136,7 @@ export default function DetalleProducto({ productoId, alVolver, favoritos, alAlt
 
         <div className="detail-sidebar">
           <div className="detail-card">
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '12px' }}>Ubicación exacta y zona</h3>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '12px' }}>Ubicación aproximada y zona</h3>
             <MapaUbicacion ubicacion={producto.ubicacion} />
           </div>
 
